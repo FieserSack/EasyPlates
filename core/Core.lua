@@ -30,6 +30,21 @@ local function InitDB()
 	end
 	EasyPlatesDB = EP.MergeDefaults(EasyPlatesDB, EP.Defaults)
 	EP.db = EasyPlatesDB
+	-- Fixed defaults (no longer configurable in options)
+	EP.db.colors.tapped = EP.CopyTable(EP.Defaults.colors.tapped)
+	EP.db.colors.cast = EP.CopyTable(EP.Defaults.colors.cast)
+	-- Primary health format has no "Keine"; migrate older NONE value
+	if not EP.db.healthTextFormat or EP.db.healthTextFormat == "NONE" then
+		EP.db.healthTextFormat = EP.Defaults.healthTextFormat
+	end
+	if EP.db.healthTextFormat2 == nil then
+		EP.db.healthTextFormat2 = EP.Defaults.healthTextFormat2
+	end
+	if EP.db.healthTextAlign2 == nil then
+		EP.db.healthTextAlign2 = EP.Defaults.healthTextAlign2
+	end
+	EP.ResolveHealthFormat2(EP.db)
+	EP.ResolveHealthAlign2(EP.db)
 	-- Once: sync buff/debuff size to cast-spell icon (castHeight + 2)
 	if not EP.db._auraMatchCastIcon then
 		EP.db.auraSize = EP.GetCastSpellIconSize(EP.db)

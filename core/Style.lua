@@ -34,6 +34,23 @@ function EP.CreateVisual(parent)
 	health:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", 0, 0)
 	frame.health = health
 
+	-- Primary + secondary health text as StatusBar children (draw above bar fill)
+	local healthText = health:CreateFontString(nil, "OVERLAY")
+	healthText:SetFont(db.font, EP.GetHealthTextFontSize(db), db.fontOutline)
+	healthText:SetTextColor(1, 1, 1)
+	healthText:SetShadowOffset(1, -1)
+	EP.AnchorHealthText(healthText, health, db.healthTextAlign)
+	healthText:SetText("")
+	frame.healthText = healthText
+
+	local healthText2 = health:CreateFontString(nil, "OVERLAY")
+	healthText2:SetFont(db.font, EP.GetHealthTextFontSize(db), db.fontOutline)
+	healthText2:SetTextColor(1, 1, 1)
+	healthText2:SetShadowOffset(1, -1)
+	EP.AnchorHealthText(healthText2, health, db.healthTextAlign2)
+	healthText2:SetText("")
+	frame.healthText2 = healthText2
+
 	-- Border (3.3.5a-compatible edge texture)
 	if db.border then
 		local border = CreateFrame("Frame", nil, health)
@@ -157,6 +174,40 @@ function EP.ApplyStyle(visual)
 	visual.health:SetStatusBarTexture(db.texture)
 	visual.bg:SetTexture(db.texture)
 	visual.bg:SetVertexColor(unpack(db.colors.background))
+	local function EnsureHealthFS(key)
+		if not visual.health then
+			return
+		end
+		if not visual[key] then
+			local fs = visual.health:CreateFontString(nil, "OVERLAY")
+			fs:SetTextColor(1, 1, 1)
+			fs:SetShadowOffset(1, -1)
+			visual[key] = fs
+		elseif visual[key].GetParent and visual[key]:GetParent() ~= visual.health then
+			-- Older builds parented to content (behind the bar) — bring back on top
+			visual[key]:SetParent(visual.health)
+			if visual[key].SetDrawLayer then
+				visual[key]:SetDrawLayer("OVERLAY")
+			end
+		end
+	end
+	EnsureHealthFS("healthText")
+	EnsureHealthFS("healthText2")
+	local fontSize = EP.GetHealthTextFontSize(db)
+	if visual.healthText then
+		visual.healthText:SetFont(db.font, fontSize, db.fontOutline)
+		EP.AnchorHealthText(visual.healthText, visual.health, db.healthTextAlign)
+		if not db.showHealthText then
+			visual.healthText:Hide()
+		end
+	end
+	if visual.healthText2 then
+		visual.healthText2:SetFont(db.font, fontSize, db.fontOutline)
+		EP.AnchorHealthText(visual.healthText2, visual.health, db.healthTextAlign2)
+		if not db.showHealthText then
+			visual.healthText2:Hide()
+		end
+	end
 	visual.name:SetFont(db.font, db.fontSize, db.fontOutline)
 	visual.name:SetTextColor(unpack(db.colors.name))
 	visual.level:SetFont(db.font, db.fontSize - 1, db.fontOutline)

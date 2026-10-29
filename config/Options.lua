@@ -140,11 +140,45 @@ local function BuildPanel()
 		{ key = "hostile",  label = "Feindlich",   hasAlpha = false },
 		{ key = "neutral",  label = "Neutral",     hasAlpha = false },
 		{ key = "friendly", label = "Freundlich",  hasAlpha = false },
-		{ key = "tapped",   label = "Getappt",     hasAlpha = false },
-		{ key = "cast",     label = "Zauberleiste", hasAlpha = false },
 		{ key = "background", label = "Balkenhintergrund", hasAlpha = true },
 		{ key = "border",   label = "Rahmen",      hasAlpha = true },
 	}
+
+	local function AddCheck(name, label, key, yOff, opts)
+		opts = opts or {}
+		local x = opts.x or 276
+		local check = CreateFrame("CheckButton", name, panel, "InterfaceOptionsCheckButtonTemplate")
+		check:SetPoint("TOPLEFT", x, yOff)
+		if opts.small then
+			check:SetWidth(24)
+			check:SetHeight(24)
+		end
+		local text = _G[check:GetName() .. "Text"]
+		text:SetText(label)
+		if opts.small then
+			text:SetFontObject(GameFontHighlightSmall)
+			text:ClearAllPoints()
+			text:SetPoint("LEFT", check, "RIGHT", 0, 1)
+		end
+		check.dbKey = key
+		check:SetScript("OnClick", function(self)
+			EP.db[key] = self:GetChecked() and true or false
+			if self.onToggle then
+				self:onToggle()
+			end
+			if EP.RefreshAllVisuals then
+				EP.RefreshAllVisuals()
+			end
+		end)
+		check:SetScript("OnShow", function(self)
+			self:SetChecked(EP.db and EP.db[key])
+			if self.onShowExtra then
+				self:onShowExtra()
+			end
+		end)
+		check:SetChecked(EP.db and EP.db[key])
+		return check
+	end
 
 	local y = -95
 	for i, info in ipairs(barKeys) do
@@ -152,6 +186,193 @@ local function BuildPanel()
 		panel.swatches[#panel.swatches + 1] = sw
 		y = y - 30
 	end
+
+	-- Lebensanzeige (left column, under reaction colors)
+	-- 1. Format + Align   2. Format2 (Keine…) + Align2
+	y = y - 10
+	local alignChoices = {
+		{ value = "LEFT", text = "Links" },
+		{ value = "CENTER", text = "Mitte" },
+		{ value = "RIGHT", text = "Rechts" },
+	}
+	local formatChoices1 = {
+		{ value = "CURRENT", text = "Leben" },
+		{ value = "CURRENT_MAX", text = "Leben/max" },
+		{ value = "PERCENT", text = "Prozent" },
+	}
+	local formatChoices2 = {
+		{ value = "NONE", text = "Keine" },
+		{ value = "CURRENT", text = "Leben" },
+		{ value = "CURRENT_MAX", text = "Leben/max" },
+		{ value = "PERCENT", text = "Prozent" },
+	}
+
+	local function ChoiceLabel(list, value)
+		for i = 1, #list do
+			if list[i].value == value then
+				return list[i].text
+			end
+		end
+		return value
+	end
+
+	local function MakeChooser(name, key, choices, x, yOff, width, opts)
+		opts = opts or {}
+		local drop = CreateFrame("Frame", name, panel, "UIDropDownMenuTemplate")
+		drop:SetPoint("TOPLEFT", x, yOff)
+		UIDropDownMenu_SetWidth(drop, width or 90)
+		UIDropDownMenu_JustifyText(drop, "LEFT")
+		drop.dbKey = key
+		drop.choices = choices
+		drop.isDisabledOption = opts.isDisabledOption
+		drop.onChanged = opts.onChanged
+
+		local function Refresh()
+			local cur = EP.db and EP.db[key]
+			UIDropDownMenu_SetSelectedValue(drop, cur)
+			UIDropDownMenu_SetText(drop, ChoiceLabel(choices, cur))
+		end
+		drop.Refresh = Refresh
+
+		UIDropDownMenu_Initialize(drop, function()
+			for i = 1, #choices do
+				local c = choices[i]
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = c.text
+				info.value = c.value
+				info.checked = EP.db and EP.db[key] == c.value
+				if drop.isDisabledOption and drop.isDisabledOption(c.value) then
+					info.disabled = true
+				end
+				info.func = function()
+					EP.db[key] = c.value
+					if drop.onChanged then
+						drop.onChanged(c.value)
+					end
+					Refresh()
+					if EP.RefreshAllVisuals then
+						EP.RefreshAllVisuals()
+					end
+				end
+				UIDropDownMenu_AddButton(info)
+			end
+		end)
+		Refresh()
+		return drop
+	end
+
+	local function SetDropEnabled(drop, enabled)
+		if not drop then
+			return
+		end
+		drop:Refresh()
+		if enabled then
+			UIDropDownMenu_EnableDropDown(drop)
+		else
+			UIDropDownMenu_DisableDropDown(drop)
+		end
+	end
+
+	local function SyncHealthChoosers()
+		local enabled = EP.db and EP.db.showHealthText
+		if panel.healthTextCheck then
+			panel.healthTextCheck:SetChecked(enabled)
+		end
+		if EP.db then
+			EP.ResolveHealthFormat2(EP.db)
+			EP.ResolveHealthAlign2(EP.db)
+		end
+		local labelFont = enabled and GameFontNormalSmall or GameFontDisableSmall
+		if panel.healthRow1Label then
+			panel.healthRow1Label:SetFontObject(labelFont)
+		end
+		if panel.healthRow2Label then
+			panel.healthRow2Label:SetFontObject(labelFont)
+		end
+		SetDropEnabled(panel.healthFormatDrop, enabled)
+		SetDropEnabled(panel.healthAlignDrop, enabled)
+		SetDropEnabled(panel.healthFormat2Drop, enabled)
+		SetDropEnabled(panel.healthAlign2Drop, enabled)
+	end
+
+	panel.healthTextCheck = AddCheck("EasyPlatesShowHealthTextCheck", "Lebensanzeige", "showHealthText", y, { x = 16 })
+	panel.healthTextCheck.onToggle = SyncHealthChoosers
+	panel.healthTextCheck.onShowExtra = SyncHealthChoosers
+
+	local function OnPrimaryFormatChanged()
+		if EP.db then
+			EP.ResolveHealthFormat2(EP.db)
+		end
+		if panel.healthFormat2Drop then
+			panel.healthFormat2Drop:Refresh()
+		end
+	end
+
+	local function OnPrimaryAlignChanged()
+		if EP.db then
+			EP.ResolveHealthAlign2(EP.db)
+		end
+		if panel.healthAlign2Drop then
+			panel.healthAlign2Drop:Refresh()
+		end
+	end
+
+	-- 1. Format + Align
+	y = y - 26
+	panel.healthRow1Label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+	panel.healthRow1Label:SetPoint("TOPLEFT", 32, y - 6)
+	panel.healthRow1Label:SetText("1.")
+	panel.healthFormatDrop = MakeChooser(
+		"EasyPlatesHealthFormatDropDown",
+		"healthTextFormat",
+		formatChoices1,
+		40,
+		y,
+		100,
+		{ onChanged = OnPrimaryFormatChanged }
+	)
+	panel.healthAlignDrop = MakeChooser(
+		"EasyPlatesHealthAlignDropDown",
+		"healthTextAlign",
+		alignChoices,
+		148,
+		y,
+		88,
+		{ onChanged = OnPrimaryAlignChanged }
+	)
+
+	-- 2. Format2 (Keine…) + Align2 — gewählte Optionen aus Zeile 1 sind gesperrt
+	y = y - 28
+	panel.healthRow2Label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+	panel.healthRow2Label:SetPoint("TOPLEFT", 32, y - 6)
+	panel.healthRow2Label:SetText("2.")
+	panel.healthFormat2Drop = MakeChooser(
+		"EasyPlatesHealthFormat2DropDown",
+		"healthTextFormat2",
+		formatChoices2,
+		40,
+		y,
+		100,
+		{
+			isDisabledOption = function(value)
+				return EP.db and EP.IsHealthFormatBlocked(EP.db.healthTextFormat, value)
+			end,
+		}
+	)
+	panel.healthAlign2Drop = MakeChooser(
+		"EasyPlatesHealthAlign2DropDown",
+		"healthTextAlign2",
+		alignChoices,
+		148,
+		y,
+		88,
+		{
+			isDisabledOption = function(value)
+				return EP.db and EP.IsHealthAlignBlocked(EP.db.healthTextAlign, value)
+			end,
+		}
+	)
+	SyncHealthChoosers()
 
 	-- Overlay text + target colors
 	CreateHeader(panel, "Overlay-Schrift", 260, -70)
@@ -179,32 +400,46 @@ local function BuildPanel()
 	CreateHeader(panel, "Anzeige", 260, ty)
 	ty = ty - 28
 
-	local function AddCheck(name, label, key, yOff)
-		local check = CreateFrame("CheckButton", name, panel, "InterfaceOptionsCheckButtonTemplate")
-		check:SetPoint("TOPLEFT", 276, yOff)
-		_G[check:GetName() .. "Text"]:SetText(label)
-		check:SetScript("OnClick", function(self)
-			EP.db[key] = self:GetChecked() and true or false
-			if EP.RefreshAllVisuals then
-				EP.RefreshAllVisuals()
+	local function SyncAuraChildChecks()
+		local enabled = EP.db and EP.db.showAuras
+		if panel.buffsCheck then
+			panel.buffsCheck:SetChecked(EP.db and EP.db.showBuffs)
+			if enabled then
+				panel.buffsCheck:Enable()
+				_G[panel.buffsCheck:GetName() .. "Text"]:SetFontObject(GameFontHighlightSmall)
+			else
+				panel.buffsCheck:Disable()
+				_G[panel.buffsCheck:GetName() .. "Text"]:SetFontObject(GameFontDisableSmall)
 			end
-		end)
-		check:SetScript("OnShow", function(self)
-			self:SetChecked(EP.db and EP.db[key])
-		end)
-		check:SetChecked(EP.db and EP.db[key])
-		return check
+		end
+		if panel.debuffsCheck then
+			panel.debuffsCheck:SetChecked(EP.db and EP.db.showDebuffs)
+			if enabled then
+				panel.debuffsCheck:Enable()
+				_G[panel.debuffsCheck:GetName() .. "Text"]:SetFontObject(GameFontHighlightSmall)
+			else
+				panel.debuffsCheck:Disable()
+				_G[panel.debuffsCheck:GetName() .. "Text"]:SetFontObject(GameFontDisableSmall)
+			end
+		end
 	end
 
 	panel.threatCheck = AddCheck("EasyPlatesShowThreatCheck", "Bedrohung in %", "showThreat", ty)
 	ty = ty - 26
-	panel.raidCheck = AddCheck("EasyPlatesShowRaidCheck", "Raid-Symbol", "showRaidIcon", ty)
-	ty = ty - 26
 	panel.aurasCheck = AddCheck("EasyPlatesShowAurasCheck", "Buffs / Debuffs", "showAuras", ty)
-	ty = ty - 26
-	panel.buffsCheck = AddCheck("EasyPlatesShowBuffsCheck", "Buffs anzeigen", "showBuffs", ty)
-	ty = ty - 26
-	panel.debuffsCheck = AddCheck("EasyPlatesShowDebuffsCheck", "Debuffs anzeigen", "showDebuffs", ty)
+	panel.aurasCheck.onToggle = SyncAuraChildChecks
+	panel.aurasCheck.onShowExtra = SyncAuraChildChecks
+	ty = ty - 22
+	panel.buffsCheck = AddCheck("EasyPlatesShowBuffsCheck", "Buffs", "showBuffs", ty, {
+		x = 300,
+		small = true,
+	})
+	ty = ty - 20
+	panel.debuffsCheck = AddCheck("EasyPlatesShowDebuffsCheck", "Debuffs", "showDebuffs", ty, {
+		x = 300,
+		small = true,
+	})
+	SyncAuraChildChecks()
 
 	-- Reset button (classic UI style)
 	local reset = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
@@ -219,7 +454,11 @@ local function BuildPanel()
 			EP.RefreshAllVisuals()
 		end
 		panel:RefreshSwatches()
-		DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99EasyPlates|r: Farben zurückgesetzt.")
+		panel.threatCheck:SetChecked(EP.db.showThreat)
+		panel.aurasCheck:SetChecked(EP.db.showAuras)
+		SyncAuraChildChecks()
+		SyncHealthChoosers()
+		DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99EasyPlates|r: Einstellungen zurückgesetzt.")
 	end)
 
 	local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
@@ -235,6 +474,10 @@ local function BuildPanel()
 	panel.refresh = function(self)
 		if EP.db then
 			self:RefreshSwatches()
+			self.threatCheck:SetChecked(EP.db.showThreat)
+			self.aurasCheck:SetChecked(EP.db.showAuras)
+			SyncAuraChildChecks()
+			SyncHealthChoosers()
 		end
 	end
 
@@ -247,6 +490,10 @@ local function BuildPanel()
 			EP.RefreshAllVisuals()
 		end
 		panel:RefreshSwatches()
+		panel.threatCheck:SetChecked(EP.db.showThreat)
+		panel.aurasCheck:SetChecked(EP.db.showAuras)
+		SyncAuraChildChecks()
+		SyncHealthChoosers()
 	end
 
 	InterfaceOptions_AddCategory(panel)

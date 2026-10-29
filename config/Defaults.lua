@@ -17,11 +17,17 @@ EasyPlates.Defaults = {
 	showLevel = true,
 	showCastbar = true,
 	showElite = true,
-	showRaidIcon = true,
 	showThreat = true,
 	showAuras = true,
 	showBuffs = true,
 	showDebuffs = true,
+	-- Health text on the bar (off by default)
+	-- Row 1: primary format + align; Row 2: secondary (Keine default) + align
+	showHealthText = false,
+	healthTextFormat = "PERCENT", -- CURRENT | CURRENT_MAX | PERCENT
+	healthTextAlign = "LEFT", -- LEFT | CENTER | RIGHT
+	healthTextFormat2 = "NONE", -- NONE | CURRENT | CURRENT_MAX | PERCENT
+	healthTextAlign2 = "RIGHT", -- LEFT | CENTER | RIGHT
 	-- Aura icons match cast-spell icon size (castHeight + 2)
 	auraSize = 12,
 	auraSpacing = 3,

@@ -69,6 +69,23 @@ local function UpdateHealth(plate)
 	local r, g, b = health:GetStatusBarColor()
 	r, g, b = EP.GetReactionColor(r, g, b, db)
 	visual.health:SetStatusBarColor(r, g, b)
+
+	local function ApplyHealthFS(fs, fmt, align)
+		if not fs then
+			return
+		end
+		local show = db.showHealthText and fmt and fmt ~= "NONE"
+		if show then
+			fs:SetText(EP.FormatHealthText(val, maxV, fmt))
+			EP.AnchorHealthText(fs, visual.health, align)
+			fs:Show()
+		else
+			fs:SetText("")
+			fs:Hide()
+		end
+	end
+	ApplyHealthFS(visual.healthText, db.healthTextFormat, db.healthTextAlign)
+	ApplyHealthFS(visual.healthText2, EP.ResolveHealthFormat2(db), EP.ResolveHealthAlign2(db))
 end
 
 local function UpdateIdentity(plate)
@@ -120,15 +137,11 @@ local function UpdateIdentity(plate)
 		visual.name:SetPoint("BOTTOMRIGHT", visual.bg, "TOPRIGHT", 0, 2)
 	end
 
-	-- Raid mark: left of name + health (combined height, 10% smaller)
+	-- Raid mark: always shown when Blizzard provides one
 	local raid = plate.raidIcon or visual.raid
 	if raid then
 		EP.AnchorRaidIcon(raid, visual.name, visual.bg, db)
-		if db.showRaidIcon then
-			raid:SetAlpha(1)
-		else
-			raid:SetAlpha(0)
-		end
+		raid:SetAlpha(1)
 	end
 end
 
