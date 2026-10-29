@@ -1,0 +1,12 @@
+# WoW / editor
+*.bak
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local / generated
+*.log
+.luarc.json

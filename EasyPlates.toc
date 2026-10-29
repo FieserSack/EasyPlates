@@ -1,0 +1,16 @@
+## Interface: 30300
+## Title: EasyPlates
+## Notes: Custom nameplates for Wrath of the Lich King 3.3.5a
+## Author: Dusty
+## Version: 1.0.0
+## SavedVariables: EasyPlatesDB
+## DefaultState: enabled
+
+config\Defaults.lua
+config\Options.lua
+core\Utils.lua
+core\Style.lua
+core\Auras.lua
+core\Scanner.lua
+core\Plate.lua
+core\Core.lua
