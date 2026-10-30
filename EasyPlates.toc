@@ -2,7 +2,7 @@
 ## Title: EasyPlates
 ## Notes: Custom nameplates for Wrath of the Lich King 3.3.5a
 ## Author: Dusty
-## Version: 1.0.0
+## Version: 0.1
 ## SavedVariables: EasyPlatesDB
 ## DefaultState: enabled
 

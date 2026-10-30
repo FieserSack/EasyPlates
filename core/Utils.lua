@@ -182,19 +182,51 @@ function EP.SetStatusBarColor(bar, r, g, b, a)
 	end
 end
 
-function EP.GetReactionColor(r, g, b, db)
+local function ReactionKey(r, g, b)
 	-- Blizzard default nameplate colors encode reaction
 	if g > 0.9 and r > 0.9 and b < 0.2 then
-		return unpack(db.colors.neutral)
+		return "neutral"
 	elseif r > 0.9 and g < 0.2 and b < 0.2 then
-		return unpack(db.colors.hostile)
+		return "hostile"
 	elseif b > 0.9 and r < 0.2 and g < 0.2 then
 		-- rare / special blue-ish defaults fall through
-		return unpack(db.colors.hostile)
+		return "hostile"
 	elseif g > 0.9 and r < 0.2 and b < 0.2 then
-		return unpack(db.colors.friendly)
+		return "friendly"
 	elseif r > 0.5 and g > 0.5 and b > 0.5 and r < 0.7 then
+		return "tapped"
+	end
+	return nil
+end
+
+function EP.GetReactionColor(r, g, b, db)
+	local key = ReactionKey(r, g, b)
+	if key == "neutral" then
+		return unpack(db.colors.neutral)
+	elseif key == "hostile" then
+		return unpack(db.colors.hostile)
+	elseif key == "friendly" then
+		return unpack(db.colors.friendly)
+	elseif key == "tapped" then
 		return unpack(db.colors.tapped)
 	end
 	return r, g, b
+end
+
+function EP.GetReactionTextColor(r, g, b, db)
+	local key = ReactionKey(r, g, b)
+	local c
+	if key == "neutral" then
+		c = db.colors.neutralText
+	elseif key == "hostile" then
+		c = db.colors.hostileText
+	elseif key == "friendly" then
+		c = db.colors.friendlyText
+	else
+		c = db.colors.name
+	end
+	if c then
+		return unpack(c)
+	end
+	return 1, 1, 1
 end

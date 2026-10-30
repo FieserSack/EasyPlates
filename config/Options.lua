@@ -63,7 +63,8 @@ local function CreateHeader(parent, text, x, y)
 	return fs
 end
 
-local function CreateColorSwatch(parent, label, key, hasAlpha, x, y)
+local function CreateColorSwatch(parent, label, key, hasAlpha, x, y, opts)
+	opts = opts or {}
 	local btn = CreateFrame("Button", nil, parent)
 	btn:SetPoint("TOPLEFT", x, y)
 	btn:SetWidth(24)
@@ -89,9 +90,14 @@ local function CreateColorSwatch(parent, label, key, hasAlpha, x, y)
 	check:Hide()
 	btn.check = check
 
-	local name = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	name:SetPoint("LEFT", btn, "RIGHT", 8, 0)
-	name:SetText(label)
+	if not opts.noLabel then
+		local name = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+		name:SetPoint("LEFT", btn, "RIGHT", 8, 0)
+		name:SetText(label)
+		btn.label = name
+	end
+
+	local tip = opts.tooltip or label
 
 	function btn:Update()
 		local r, g, b, a = GetColor(key)
@@ -104,7 +110,7 @@ local function CreateColorSwatch(parent, label, key, hasAlpha, x, y)
 
 	btn:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(label, 1, 1, 1)
+		GameTooltip:SetText(tip, 1, 1, 1)
 		GameTooltip:AddLine("Klicken, um die Farbe zu ändern.", 0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
@@ -125,21 +131,19 @@ local function BuildPanel()
 	title:SetPoint("TOPLEFT", 16, -16)
 	title:SetText("EasyPlates")
 
-	local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-	sub:SetPoint("RIGHT", panel, "RIGHT", -32, 0)
-	sub:SetJustifyH("LEFT")
-	sub:SetText("Eigene Nameplates für Wrath of the Lich King 3.3.5a.\nFarben gelten sofort für alle sichtbaren Plates.")
+	local version = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	version:SetPoint("LEFT", title, "RIGHT", 8, 0)
+	version:SetText("v. " .. (EP.VERSION or "0.1"))
 
 	panel.swatches = {}
 
-	-- Reaction / bar colors
-	CreateHeader(panel, "Reaktionsfarben (Balken)", 16, -70)
+	-- Reaction / bar + text colors
+	CreateHeader(panel, "Reaktionsfarben (Balken/Text)", 16, -48)
 
 	local barKeys = {
-		{ key = "hostile",  label = "Feindlich",   hasAlpha = false },
-		{ key = "neutral",  label = "Neutral",     hasAlpha = false },
-		{ key = "friendly", label = "Freundlich",  hasAlpha = false },
+		{ key = "hostile",  label = "Feindlich",   hasAlpha = false, textKey = "hostileText" },
+		{ key = "neutral",  label = "Neutral",     hasAlpha = false, textKey = "neutralText" },
+		{ key = "friendly", label = "Freundlich",  hasAlpha = false, textKey = "friendlyText" },
 		{ key = "background", label = "Balkenhintergrund", hasAlpha = true },
 		{ key = "border",   label = "Rahmen",      hasAlpha = true },
 	}
@@ -180,16 +184,43 @@ local function BuildPanel()
 		return check
 	end
 
-	local y = -95
+	local y = -73
 	for i, info in ipairs(barKeys) do
-		local sw = CreateColorSwatch(panel, info.label, info.key, info.hasAlpha, 32, y)
-		panel.swatches[#panel.swatches + 1] = sw
+		if info.textKey then
+			local sw = CreateColorSwatch(panel, info.label, info.key, info.hasAlpha, 32, y, {
+				noLabel = true,
+				tooltip = info.label .. " – Balken",
+			})
+			panel.swatches[#panel.swatches + 1] = sw
+
+			local sep = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			sep:SetPoint("LEFT", sw, "RIGHT", 4, 0)
+			sep:SetText(" / ")
+
+			local tsw = CreateColorSwatch(panel, info.label, info.textKey, false, 32, y, {
+				noLabel = true,
+				tooltip = info.label .. " – Schriftfarbe",
+			})
+			tsw:ClearAllPoints()
+			tsw:SetPoint("LEFT", sep, "RIGHT", 4, 0)
+			panel.swatches[#panel.swatches + 1] = tsw
+
+			local name = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			name:SetPoint("LEFT", tsw, "RIGHT", 8, 0)
+			name:SetText(info.label)
+		else
+			local sw = CreateColorSwatch(panel, info.label, info.key, info.hasAlpha, 32, y)
+			panel.swatches[#panel.swatches + 1] = sw
+		end
 		y = y - 30
 	end
 
-	-- Lebensanzeige (left column, under reaction colors)
+	-- Anzeige (left column, under reaction colors)
+	-- Lebensanzeige + Bedrohung; Buffs/Debuffs remain right column
+	y = y - 14
+	CreateHeader(panel, "Anzeige", 16, y)
+	y = y - 24
 	-- 1. Format + Align   2. Format2 (Keine…) + Align2
-	y = y - 10
 	local alignChoices = {
 		{ value = "LEFT", text = "Links" },
 		{ value = "CENTER", text = "Mitte" },
@@ -295,6 +326,7 @@ local function BuildPanel()
 		SetDropEnabled(panel.healthAlign2Drop, enabled)
 	end
 
+	local healthCheckY = y
 	panel.healthTextCheck = AddCheck("EasyPlatesShowHealthTextCheck", "Lebensanzeige", "showHealthText", y, { x = 16 })
 	panel.healthTextCheck.onToggle = SyncHealthChoosers
 	panel.healthTextCheck.onShowExtra = SyncHealthChoosers
@@ -374,15 +406,18 @@ local function BuildPanel()
 	)
 	SyncHealthChoosers()
 
+	y = y - 30
+	panel.threatCheck = AddCheck("EasyPlatesShowThreatCheck", "Bedrohung in %", "showThreat", y, { x = 16 })
+
 	-- Overlay text + target colors
-	CreateHeader(panel, "Overlay-Schrift", 260, -70)
+	CreateHeader(panel, "Overlay-Schrift", 260, -48)
 
 	local textKeys = {
 		{ key = "name",  label = "Name",  hasAlpha = false },
 		{ key = "level", label = "Stufe", hasAlpha = false },
 	}
 
-	local ty = -95
+	local ty = -73
 	for i, info in ipairs(textKeys) do
 		local sw = CreateColorSwatch(panel, info.label, info.key, info.hasAlpha, 276, ty)
 		panel.swatches[#panel.swatches + 1] = sw
@@ -396,10 +431,20 @@ local function BuildPanel()
 		panel.swatches[#panel.swatches + 1] = sw
 	end
 
-	ty = ty - 40
-	CreateHeader(panel, "Anzeige", 260, ty)
-	ty = ty - 28
+	-- Mana: color + enable (plate bar wired later)
+	ty = ty - 30
+	do
+		local sw = CreateColorSwatch(panel, "Mana", "mana", false, 276, ty, {
+			noLabel = true,
+			tooltip = "Mana",
+		})
+		panel.swatches[#panel.swatches + 1] = sw
+		panel.manaCheck = AddCheck("EasyPlatesShowManaCheck", "Mana", "showMana", ty - 2, {
+			x = 308,
+		})
+	end
 
+	-- Buffs / Debuffs: same height as Lebensanzeige under Anzeige
 	local function SyncAuraChildChecks()
 		local enabled = EP.db and EP.db.showAuras
 		if panel.buffsCheck then
@@ -424,18 +469,17 @@ local function BuildPanel()
 		end
 	end
 
-	panel.threatCheck = AddCheck("EasyPlatesShowThreatCheck", "Bedrohung in %", "showThreat", ty)
-	ty = ty - 26
-	panel.aurasCheck = AddCheck("EasyPlatesShowAurasCheck", "Buffs / Debuffs", "showAuras", ty)
+	local ay = healthCheckY
+	panel.aurasCheck = AddCheck("EasyPlatesShowAurasCheck", "Buffs / Debuffs", "showAuras", ay)
 	panel.aurasCheck.onToggle = SyncAuraChildChecks
 	panel.aurasCheck.onShowExtra = SyncAuraChildChecks
-	ty = ty - 22
-	panel.buffsCheck = AddCheck("EasyPlatesShowBuffsCheck", "Buffs", "showBuffs", ty, {
+	ay = ay - 22
+	panel.buffsCheck = AddCheck("EasyPlatesShowBuffsCheck", "Buffs", "showBuffs", ay, {
 		x = 300,
 		small = true,
 	})
-	ty = ty - 20
-	panel.debuffsCheck = AddCheck("EasyPlatesShowDebuffsCheck", "Debuffs", "showDebuffs", ty, {
+	ay = ay - 20
+	panel.debuffsCheck = AddCheck("EasyPlatesShowDebuffsCheck", "Debuffs", "showDebuffs", ay, {
 		x = 300,
 		small = true,
 	})
@@ -445,7 +489,7 @@ local function BuildPanel()
 	local reset = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	reset:SetWidth(140)
 	reset:SetHeight(22)
-	reset:SetPoint("BOTTOMLEFT", 16, 16)
+	reset:SetPoint("BOTTOMRIGHT", -16, 16)
 	reset:SetText("Zurücksetzen")
 	reset:SetScript("OnClick", function()
 		EasyPlatesDB = EP.CopyTable(EP.Defaults)
@@ -455,15 +499,14 @@ local function BuildPanel()
 		end
 		panel:RefreshSwatches()
 		panel.threatCheck:SetChecked(EP.db.showThreat)
+		if panel.manaCheck then
+			panel.manaCheck:SetChecked(EP.db.showMana)
+		end
 		panel.aurasCheck:SetChecked(EP.db.showAuras)
 		SyncAuraChildChecks()
 		SyncHealthChoosers()
 		DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99EasyPlates|r: Einstellungen zurückgesetzt.")
 	end)
-
-	local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	hint:SetPoint("LEFT", reset, "RIGHT", 12, 0)
-	hint:SetText("Esc · Interface · AddOns · EasyPlates")
 
 	function panel:RefreshSwatches()
 		for _, sw in ipairs(self.swatches) do
@@ -475,6 +518,9 @@ local function BuildPanel()
 		if EP.db then
 			self:RefreshSwatches()
 			self.threatCheck:SetChecked(EP.db.showThreat)
+			if self.manaCheck then
+				self.manaCheck:SetChecked(EP.db.showMana)
+			end
 			self.aurasCheck:SetChecked(EP.db.showAuras)
 			SyncAuraChildChecks()
 			SyncHealthChoosers()
@@ -491,6 +537,9 @@ local function BuildPanel()
 		end
 		panel:RefreshSwatches()
 		panel.threatCheck:SetChecked(EP.db.showThreat)
+		if panel.manaCheck then
+			panel.manaCheck:SetChecked(EP.db.showMana)
+		end
 		panel.aurasCheck:SetChecked(EP.db.showAuras)
 		SyncAuraChildChecks()
 		SyncHealthChoosers()

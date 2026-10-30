@@ -67,8 +67,10 @@ local function UpdateHealth(plate)
 	end
 
 	local r, g, b = health:GetStatusBarColor()
+	local tr, tg, tb = EP.GetReactionTextColor(r, g, b, db)
 	r, g, b = EP.GetReactionColor(r, g, b, db)
 	visual.health:SetStatusBarColor(r, g, b)
+	visual.name:SetTextColor(tr, tg, tb)
 
 	local function ApplyHealthFS(fs, fmt, align)
 		if not fs then
@@ -95,7 +97,12 @@ local function UpdateIdentity(plate)
 	if plate.nameText then
 		visual.name:SetText(plate.nameText:GetText() or "")
 	end
-	visual.name:SetTextColor(unpack(db.colors.name))
+	if plate.health then
+		local hr, hg, hb = plate.health:GetStatusBarColor()
+		visual.name:SetTextColor(EP.GetReactionTextColor(hr, hg, hb, db))
+	else
+		visual.name:SetTextColor(unpack(db.colors.name))
+	end
 
 	if db.showLevel and plate.levelText then
 		local lvl = plate.levelText:GetText() or ""

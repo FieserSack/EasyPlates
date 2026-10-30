@@ -1,5 +1,8 @@
 EasyPlates = EasyPlates or {}
 
+-- Module version (keep in sync with EasyPlates.toc ## Version)
+EasyPlates.VERSION = "0.1"
+
 EasyPlates.Defaults = {
 	width = 120,
 	height = 12,
@@ -18,6 +21,7 @@ EasyPlates.Defaults = {
 	showCastbar = true,
 	showElite = true,
 	showThreat = true,
+	showMana = false, -- options only for now; plate bar later
 	showAuras = true,
 	showBuffs = true,
 	showDebuffs = true,
@@ -37,12 +41,17 @@ EasyPlates.Defaults = {
 		hostile = { 0.78, 0.25, 0.25 },
 		neutral = { 0.90, 0.80, 0.20 },
 		friendly = { 0.30, 0.75, 0.30 },
+		-- Name text per reaction (options: Reaktionsfarben → Text)
+		hostileText = { 1, 1, 1 },
+		neutralText = { 1, 1, 1 },
+		friendlyText = { 1, 1, 1 },
 		tapped = { 0.55, 0.55, 0.55 },
 		cast = { 0.85, 0.70, 0.20 },
 		castInterruptible = { 0.20, 0.70, 0.90 },
 		background = { 0.10, 0.10, 0.10, 0.80 },
 		border = { 0, 0, 0, 1 },
 		targetBorder = { 1.00, 0.95, 0.15, 1 }, -- leuchtendes Gelb
+		mana = { 0.00, 0.00, 1.00 }, -- Standard Mana-Blau
 		name = { 1, 1, 1 },
 		level = { 1, 0.90, 0.40 },
 	},
