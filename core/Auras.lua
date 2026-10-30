@@ -61,6 +61,8 @@ local function CreateAuraIcon(parent, isDebuff)
 
 	local cd = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
 	cd:SetAllPoints(icon)
+	-- Above icon/border/stealable so the swipe stays visible during cast/combat updates
+	cd:SetFrameLevel((btn:GetFrameLevel() or 0) + 5)
 	if cd.SetReverse then
 		cd:SetReverse(true)
 	end
@@ -81,6 +83,28 @@ local function CreateAuraIcon(parent, isDebuff)
 	btn._size = nil
 
 	return btn
+end
+
+-- Apply or clear cooldown swipe; re-arm if the frame was hidden while aura data stayed the same
+local function ApplyAuraCooldown(btn, duration, expiration, force)
+	duration = duration or 0
+	expiration = expiration or 0
+	local hasCooldown = duration > 0 and expiration > 0
+	if hasCooldown then
+		local needSet = force
+			or btn._exp ~= expiration
+			or btn._dur ~= duration
+			or (not btn.cd:IsShown())
+		if needSet then
+			CooldownFrame_SetTimer(btn.cd, expiration - duration, duration, 1)
+			btn.cd:Show()
+		end
+	elseif btn.cd:IsShown() or btn._exp ~= nil or btn._dur ~= nil then
+		CooldownFrame_SetTimer(btn.cd, 0, 0, 0)
+		btn.cd:Hide()
+	end
+	btn._exp = expiration
+	btn._dur = duration
 end
 
 function EP.CreateAuraBar(parent, visual)
@@ -123,7 +147,9 @@ local function SetIconAura(btn, x, size, texture, count, duration, expiration, i
 	expiration = expiration or 0
 	isStealable = isStealable and true or false
 
-	local cooldownChanged = (btn._exp ~= expiration) or (btn._dur ~= duration) or (btn._tex ~= texture)
+	local textureChanged = btn._tex ~= texture
+	-- Was hidden: parent/plate churn during cast/combat can drop the swipe without clearing cache
+	local wasHidden = not btn:IsShown()
 
 	if btn._x ~= x then
 		btn:ClearAllPoints()
@@ -140,9 +166,12 @@ local function SetIconAura(btn, x, size, texture, count, duration, expiration, i
 		btn.count:ClearAllPoints()
 		btn.count:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 1, -1)
 		btn._size = size
+		-- Size change repositions the cooldown region; re-arm swipe
+		btn._exp = nil
+		btn._dur = nil
 	end
 
-	if btn._tex ~= texture then
+	if textureChanged then
 		btn.icon:SetTexture(texture)
 		btn._tex = texture
 	end
@@ -184,16 +213,7 @@ local function SetIconAura(btn, x, size, texture, count, duration, expiration, i
 		end
 	end
 
-	if cooldownChanged then
-		if duration > 0 and expiration > 0 then
-			CooldownFrame_SetTimer(btn.cd, expiration - duration, duration, 1)
-			btn.cd:Show()
-		else
-			btn.cd:Hide()
-		end
-		btn._exp = expiration
-		btn._dur = duration
-	end
+	ApplyAuraCooldown(btn, duration, expiration, wasHidden or textureChanged)
 
 	btn:Show()
 end
@@ -202,6 +222,7 @@ local function HideTrailing(bar, fromIndex)
 	for i = fromIndex, #bar.icons do
 		local btn = bar.icons[i]
 		if btn:IsShown() then
+			ApplyAuraCooldown(btn, 0, 0, true)
 			btn:Hide()
 			btn._tex = nil
 			btn._count = nil
@@ -211,6 +232,8 @@ local function HideTrailing(bar, fromIndex)
 			btn._size = nil
 			btn._steal = nil
 			btn._br = nil
+			btn._bg = nil
+			btn._bb = nil
 			if btn.stealable then btn.stealable:Hide() end
 			if btn.border then btn.border:Hide() end
 		end
